@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Realm of the 125 Thrones</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<h1>Realm of the 125 Thrones</h1>
+
+<canvas id="gameCanvas" width="800" height="600"></canvas>
+
+<div id="ui">
+  <button onclick="saveGame()">Save</button>
+  <button onclick="loadGame()">Load</button>
+</div>
+
+<audio id="bgMusic" loop>
+  <source src="assets/music.mp3" type="audio/mp3">
+</audio>
+
+<script src="js/engine.js"></script>
+<script src="js/player.js"></script>
+<script src="js/map.js"></script>
+<script src="js/combat.js"></script>
+<script src="js/skills.js"></script>
+<script src="js/factions.js"></script>
+<script src="js/save.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/multiplayer.js"></script>
+
+</body>
+</html>
+body {
+  margin: 0;
+  background: linear-gradient(to bottom, #111, #000);
+  color: white;
+  text-align: center;
+  font-family: Arial, sans-serif;
+}
+
+h1 {
+  font-size: 48px;
+  letter-spacing: 2px;
+}
+
+canvas {
+  border: 1px solid white;
+  margin-top: 20px;
+}
+
+button {
+  margin: 10px;
+  padding: 15px 40px;
+  font-size: 20px;
+  background-color: #333;
+  color: white;
+  border: 2px solid white;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+button:hover {
+  background-color: #666;
+  transform: scale(1.05);
+}
+
+#ui {
+  margin-top: 20px;
+}
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+let gameState = "map"; // map, combat
+
+function gameLoop() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (gameState === "map") {
+    drawMap();
+    drawPlayer();
+  } else if (gameState === "combat") {
+    drawCombat();
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+const tileSize = 32;
+
+const map = [
+  [0,0,0,1,1,1,0,0],
+  [0,1,0,0,0,1,0,0],
+  [0,1,0,1,0,1,0,0],
+];
+
+function drawMap() {
+  for (let y = 0; y < map.length; y++) {
+    for (let x = 0; x < map[y].length; x++) {
+      if (map[y][x] === 0) {
+        ctx.fillStyle = "green";
+      } else {
+        ctx.fillStyle = "gray";
+      }
+      ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+    }
+  }
+}
+let player = {
+  x: 0,
+  y: 0,
+  hp: 100,
+  level: 1,
+  xp: 0,
+  faction: "Neutral"
+};
+
+function drawPlayer() {
+  ctx.fillStyle = "blue";
+  ctx.fillRect(player.x * tileSize, player.y * tileSize, tileSize, tileSize);
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowUp") player.y--;
+  if (e.key === "ArrowDown") player.y++;
+  if (e.key === "ArrowLeft") player.x--;
+  if (e.key === "ArrowRight") player.x++;
+
+  checkEncounter();
+});
+let enemy = { hp: 50 };
+
+function checkEncounter() {
+  if (Math.random() < 0.2) {
+    gameState = "combat";
+  }
+}
+
+function drawCombat() {
+  ctx.fillStyle = "black";
+  ctx.fillRect(0,0,800,600);
+
+  ctx.fillStyle = "white";
+  ctx.fillText("Combat!", 350, 100);
+  ctx.fillText("Enemy HP: " + enemy.hp, 350, 150);
+  ctx.fillText("Press A to Attack", 350, 200);
+}
+
+document.addEventListener("keydown", (e) => {
+  if (gameState === "combat" && e.key === "a") {
+    enemy.hp -= 10;
+    if (enemy.hp <= 0) {
+      player.xp += 20;
+      gameState = "map";
+      enemy.hp = 50;
+    }
+  }
+});
+let skills = {
+  strength: 1,
+  agility: 1,
+  magic: 1
+};
+
+function upgradeSkill(skill) {
+  if (player.xp >= 10) {
+    skills[skill]++;
+    player.xp -= 10;
+  }
+}
+const factions = {
+  IronDominion: { reputation: 0 },
+  ShadowCrown: { reputation: 0 },
+  EmeraldThrone: { reputation: 0 }
+};
+
+function joinFaction(name) {
+  player.faction = name;
+}
+window.onload = function() {
+  const music = document.getElementById("bgMusic");
+  music.volume = 0.4;
+  music.play();
+};
+function saveGame() {
+  localStorage.setItem("realmSave", JSON.stringify(player));
+  alert("Game Saved!");
+}
+
+function loadGame() {
+  const data = JSON.parse(localStorage.getItem("realmSave"));
+  if (data) {
+    player = data;
+    alert("Game Loaded!");
+  }
+}
+const socket = new WebSocket("ws://localhost:3000");
+
+socket.onmessage = function(event) {
+  console.log("Player update:", event.data);
+};
+
+function sendPosition() {
+  socket.send(JSON.stringify(player));
+}
